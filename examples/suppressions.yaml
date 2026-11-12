@@ -1,0 +1,11 @@
+suppressions:
+  - rule: CG010
+    resource: "sg-0bastion"
+    owner: infra-access
+    reason: "Legacy bastion; migrating to identity-aware proxy (SEC-1234)"
+    expires: 2027-01-31
+  - rule: CG001
+    resource: "arn:aws:s3:::public-docs-assets"
+    owner: web
+    reason: "Intentionally public documentation assets; no sensitive data"
+    expires: 2027-03-31

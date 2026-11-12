@@ -1,0 +1,133 @@
+{
+  "resources": [
+    {
+      "id": "sg-0web", "provider": "aws", "type": "network_policy", "name": "notebook-web",
+      "region": "us-west-2", "account": "111111111111", "tags": {"owner": "research-infra"},
+      "attrs": {"ingress": [
+        {"protocol": "tcp", "from_port": 443, "to_port": 443, "cidrs": ["0.0.0.0/0"]},
+        {"protocol": "tcp", "from_port": 22, "to_port": 22, "cidrs": ["0.0.0.0/0"]}
+      ]}
+    },
+    {
+      "id": "sg-0bastion", "provider": "aws", "type": "network_policy", "name": "legacy-bastion",
+      "region": "us-west-2", "account": "111111111111", "tags": {"owner": "infra-access"},
+      "attrs": {"ingress": [{"protocol": "tcp", "from_port": 22, "to_port": 22, "cidrs": ["0.0.0.0/0"]}]}
+    },
+    {
+      "id": "sg-0internal", "provider": "aws", "type": "network_policy", "name": "db-internal",
+      "region": "us-west-2", "account": "111111111111", "tags": {"owner": "data-platform"},
+      "attrs": {"ingress": [{"protocol": "tcp", "from_port": 5432, "to_port": 5432, "cidrs": ["10.0.0.0/8"]}]}
+    },
+    {
+      "id": "i-0jupyter", "provider": "aws", "type": "compute_instance", "name": "research-jupyter-01",
+      "region": "us-west-2", "account": "111111111111", "tags": {"owner": "research-infra"},
+      "attrs": {"public_ip": "54.12.34.56", "network_policies": ["sg-0web"],
+                "role": "arn:aws:iam::111111111111:role/jupyter-notebook", "imds_v2_required": false}
+    },
+    {
+      "id": "i-0trainer", "provider": "aws", "type": "compute_instance", "name": "trainer-node-17",
+      "region": "us-west-2", "account": "111111111111", "tags": {"owner": "training"},
+      "attrs": {"public_ip": null, "network_policies": ["sg-0internal"],
+                "role": "arn:aws:iam::111111111111:role/training-data-reader", "imds_v2_required": true}
+    },
+    {
+      "id": "arn:aws:iam::111111111111:role/jupyter-notebook", "provider": "aws", "type": "identity_role",
+      "name": "jupyter-notebook", "account": "111111111111", "tags": {"owner": "research-infra"},
+      "attrs": {
+        "arn": "arn:aws:iam::111111111111:role/jupyter-notebook",
+        "trusted_principals": ["ec2.amazonaws.com"],
+        "statements": [
+          {"Effect": "Allow", "Action": ["sts:AssumeRole"], "Resource": "arn:aws:iam::111111111111:role/training-*"},
+          {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": "*"}
+        ]
+      }
+    },
+    {
+      "id": "arn:aws:iam::111111111111:role/training-data-reader", "provider": "aws", "type": "identity_role",
+      "name": "training-data-reader", "account": "111111111111", "tags": {"owner": "training"},
+      "attrs": {
+        "arn": "arn:aws:iam::111111111111:role/training-data-reader",
+        "trusted_principals": ["ec2.amazonaws.com", "arn:aws:iam::111111111111:role/jupyter-notebook"],
+        "statements": [
+          {"Effect": "Allow", "Action": ["s3:GetObject", "s3:ListBucket"],
+           "Resource": ["arn:aws:s3:::model-weights-prod", "arn:aws:s3:::model-weights-prod/*"]},
+          {"Effect": "Allow", "Action": "kms:Decrypt",
+           "Resource": "arn:aws:kms:us-west-2:111111111111:key/weights-cmk"}
+        ]
+      }
+    },
+    {
+      "id": "arn:aws:iam::111111111111:role/ci-deployer", "provider": "aws", "type": "identity_role",
+      "name": "ci-deployer", "account": "111111111111", "tags": {},
+      "attrs": {
+        "arn": "arn:aws:iam::111111111111:role/ci-deployer",
+        "trusted_principals": ["*"], "trust_has_condition": false,
+        "statements": [{"Effect": "Allow", "Action": "*", "Resource": "*"}]
+      }
+    },
+    {
+      "id": "arn:aws:s3:::model-weights-prod", "provider": "aws", "type": "storage_bucket",
+      "name": "model-weights-prod", "region": "us-west-2", "account": "111111111111",
+      "tags": {"owner": "training", "data-classification": "restricted"},
+      "attrs": {"arn": "arn:aws:s3:::model-weights-prod", "public_access": false, "public_access_blocked": true,
+                "encryption": "aws:kms", "kms_key": "arn:aws:kms:us-west-2:111111111111:key/weights-cmk"}
+    },
+    {
+      "id": "arn:aws:s3:::public-docs-assets", "provider": "aws", "type": "storage_bucket",
+      "name": "public-docs-assets", "region": "us-west-2", "account": "111111111111",
+      "tags": {"owner": "web", "data-classification": "public"},
+      "attrs": {"arn": "arn:aws:s3:::public-docs-assets", "public_access": true, "public_access_blocked": false,
+                "encryption": "AES256"}
+    },
+    {
+      "id": "arn:aws:kms:us-west-2:111111111111:key/weights-cmk", "provider": "aws", "type": "crypto_key",
+      "name": "weights-cmk", "region": "us-west-2", "account": "111111111111", "tags": {"owner": "training"},
+      "attrs": {"arn": "arn:aws:kms:us-west-2:111111111111:key/weights-cmk", "managed_by": "customer",
+                "rotation_enabled": false}
+    },
+    {
+      "id": "arn:aws:eks:us-west-2:111111111111:cluster/training", "provider": "aws", "type": "kube_cluster",
+      "name": "training", "region": "us-west-2", "account": "111111111111", "tags": {"owner": "training"},
+      "attrs": {"endpoint_public": true, "public_cidrs": ["0.0.0.0/0"], "secrets_encryption": false,
+                "audit_logging": false}
+    },
+    {
+      "id": "/subscriptions/sub-1/resourceGroups/evals/providers/Microsoft.Storage/storageAccounts/evalsdata",
+      "provider": "azure", "type": "storage_bucket", "name": "evalsdata", "region": "eastus", "account": "sub-1",
+      "tags": {"owner": "evals", "data-classification": "sensitive"},
+      "attrs": {"arn": "/subscriptions/sub-1/resourceGroups/evals/providers/Microsoft.Storage/storageAccounts/evalsdata",
+                "public_access": false, "encryption": "provider-managed", "min_tls": "TLS1_0",
+                "shared_key_access": true}
+    },
+    {
+      "id": "/subscriptions/sub-1/resourceGroups/gpu/providers/Microsoft.Network/networkSecurityGroups/nsg-gpu",
+      "provider": "azure", "type": "network_policy", "name": "nsg-gpu", "region": "eastus", "account": "sub-1",
+      "tags": {"owner": "gpu-fleet"},
+      "attrs": {"ingress": [{"protocol": "tcp", "from_port": 3389, "to_port": 3389, "cidrs": ["Internet"]}]}
+    },
+    {
+      "id": "/subscriptions/sub-1/resourceGroups/gpu/providers/Microsoft.Compute/virtualMachines/gpu-vm-01",
+      "provider": "azure", "type": "compute_instance", "name": "gpu-vm-01", "region": "eastus", "account": "sub-1",
+      "tags": {"owner": "gpu-fleet"},
+      "attrs": {"public_ip": "pip-gpu-vm-01",
+                "network_policies": ["/subscriptions/sub-1/resourceGroups/gpu/providers/Microsoft.Network/networkSecurityGroups/nsg-gpu"],
+                "role": "/subscriptions/sub-1/resourceGroups/gpu/providers/Microsoft.Compute/virtualMachines/gpu-vm-01/identity"}
+    },
+    {
+      "id": "/subscriptions/sub-1/resourceGroups/gpu/providers/Microsoft.Compute/virtualMachines/gpu-vm-01/identity",
+      "provider": "azure", "type": "identity_role", "name": "gpu-vm-01-managed-identity", "region": "eastus",
+      "account": "sub-1", "tags": {"owner": "gpu-fleet"},
+      "attrs": {"arn": "/subscriptions/sub-1/resourceGroups/gpu/providers/Microsoft.Compute/virtualMachines/gpu-vm-01/identity",
+                "trusted_principals": [],
+                "statements": [{"Effect": "Allow",
+                                "Action": ["Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read"],
+                                "Resource": ["/subscriptions/sub-1*"]}]}
+    },
+    {
+      "id": "/subscriptions/sub-1/resourceGroups/gpu/providers/Microsoft.ContainerService/managedClusters/aks-inference",
+      "provider": "azure", "type": "kube_cluster", "name": "aks-inference", "region": "eastus", "account": "sub-1",
+      "tags": {"owner": "inference"},
+      "attrs": {"endpoint_public": false, "public_cidrs": [], "secrets_encryption": true, "audit_logging": true}
+    }
+  ]
+}
